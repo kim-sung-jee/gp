@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-type ConsistentHash struct {
+type Hash struct {
 	mu           sync.RWMutex
 	replicas     int
 	keys         []int
@@ -15,18 +15,18 @@ type ConsistentHash struct {
 	hashFunction func(data []byte) uint32
 }
 
-func NewConsistentHash(replicas int, fn func(data []byte) uint32) *ConsistentHash {
+func NewConsistentHash(replicas int, fn func(data []byte) uint32) *Hash {
 	if fn == nil {
 		fn = crc32.ChecksumIEEE
 	}
-	return &ConsistentHash{
+	return &Hash{
 		replicas:     replicas,
 		hashMap:      make(map[int]string),
 		hashFunction: fn,
 	}
 }
 
-func (c *ConsistentHash) Add(key string) {
+func (c *Hash) Add(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -39,7 +39,7 @@ func (c *ConsistentHash) Add(key string) {
 	sort.Ints(c.keys)
 }
 
-func (c *ConsistentHash) Remove(key string) {
+func (c *Hash) Remove(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -53,7 +53,7 @@ func (c *ConsistentHash) Remove(key string) {
 	}
 }
 
-func (c *ConsistentHash) Get(key string) string {
+func (c *Hash) Get(key string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
