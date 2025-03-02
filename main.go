@@ -37,7 +37,7 @@ func main() {
 }
 
 func someFunction(name string) int {
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second)
 	//fmt.Println("called processingRequest function, name is ", name)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return r.Intn(100)
