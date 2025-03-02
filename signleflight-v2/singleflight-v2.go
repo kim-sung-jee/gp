@@ -1,7 +1,6 @@
 package signleflight_v2
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -27,9 +26,7 @@ type Result struct {
 func (g *Group) Do(key string, fn func() (any, error)) (v any, err error, shared bool) {
 	actual, loaded := g.m.LoadOrStore(key, new(call))
 	c := actual.(*call)
-	fmt.Println(loaded)
 	if loaded {
-		//fmt.Print("key already exists, value is ", c.val, "\n")
 		c.dups++
 		c.wg.Wait()
 
@@ -38,20 +35,50 @@ func (g *Group) Do(key string, fn func() (any, error)) (v any, err error, shared
 
 	c.wg.Add(1)
 
-	g.doCall(key, fn)
+	g.doCall(c, key, fn)
 
 	return c.val, c.err, c.dups > 0
 }
 
-func (g *Group) doCall(key string, fn func() (any, error)) {
-	val, _ := g.m.Load(key)
-	c := val.(*call)
+func (g *Group) DoChan(key string, fn func() (any, error)) <-chan Result {
+	ch := make(chan Result, 1)
+	actual, loaded := g.m.LoadOrStore(key, &call{chans: []chan<- Result{ch}})
+	c := actual.(*call)
+	if loaded {
+		c.dups++
+		c.chans = append(c.chans, ch)
+		return ch
+	}
+	c.wg.Add(1)
+	go g.doCall(c, key, fn)
+	return ch
+}
+
+func (g *Group) doCall(c *call, key string, fn func() (any, error)) {
+	//val, _ := g.m.Load(key)
+	//c := val.(*call)
 
 	c.val, c.err = fn()
-	g.m.Delete(key)
+	if val, _ := g.m.Load(key); val == c {
+		g.m.Delete(key)
+	}
+
 	c.wg.Done()
 
 	for _, ch := range c.chans {
 		ch <- Result{c.val, c.err, c.dups > 0}
 	}
+}
+
+func (g *Group) ForgetUnshared(key string) bool {
+	val, ok := g.m.Load(key)
+	if !ok {
+		return true
+	}
+	c := val.(*call)
+	if c.dups == 0 {
+		g.m.Delete(key)
+		return true
+	}
+	return false
 }

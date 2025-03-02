@@ -14,7 +14,7 @@ func main() {
 
 	g := singleflight.Group{}
 	key := "key"
-	len := 10
+	len := 1000
 	var arr []int
 	results := make(chan int, len)
 	for i := 0; i < len; i++ {
@@ -33,7 +33,7 @@ func main() {
 		arr = append(arr, result)
 	}
 
-	fmt.Println("result", arr)
+	fmt.Println("result", allElementsSame(arr))
 }
 
 func someFunction(name string) int {
@@ -42,14 +42,17 @@ func someFunction(name string) int {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return r.Intn(100)
 }
-func distinctElements(arr []int) []int {
-	elements := make(map[int]bool)
-	result := make([]int, len(arr))
-	for i := 0; i < len(arr); i++ {
-		if _, value := elements[arr[i]]; !value {
-			elements[arr[i]] = true
-			result = append(result, arr[i])
+
+func allElementsSame(arr []int) bool {
+	if len(arr) == 0 {
+		return true
+	}
+
+	first := arr[0]
+	for _, num := range arr {
+		if num != first {
+			return false
 		}
 	}
-	return result
+	return true
 }

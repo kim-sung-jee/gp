@@ -86,61 +86,69 @@ func TestDoDupSuppress(t *testing.T) {
 	}
 }
 
-//func TestForgetUnshared(t *testing.T) {
-//	var g Group
-//
-//	var firstStarted, firstFinished sync.WaitGroup
-//
-//	firstStarted.Add(1)
-//	firstFinished.Add(1)
-//
-//	key := "key"
-//	firstCh := make(chan struct{})
-//	go func() {
-//		g.Do(key, func() (i interface{}, e error) {
-//			firstStarted.Done()
-//			<-firstCh
-//			return
-//		})
-//		firstFinished.Done()
-//	}()
-//
-//	firstStarted.Wait()
-//	g.ForgetUnshared(key) // from this point no two function using same key should be executed concurrently
-//
-//	secondCh := make(chan struct{})
-//	go func() {
-//		g.Do(key, func() (i interface{}, e error) {
-//			// Notify that we started
-//			secondCh <- struct{}{}
-//			<-secondCh
-//			return 2, nil
-//		})
-//	}()
-//
-//	<-secondCh
-//
-//	resultCh := g.DoChan(key, func() (i interface{}, e error) {
-//		panic("third must not be started")
-//	})
-//
-//	if g.ForgetUnshared(key) {
-//		t.Errorf("Before first goroutine finished, key %q is shared, should return false", key)
-//	}
-//
-//	close(firstCh)
-//	firstFinished.Wait()
-//
-//	if g.ForgetUnshared(key) {
-//		t.Errorf("After first goroutine finished, key %q is still shared, should return false", key)
-//	}
-//
-//	secondCh <- struct{}{}
-//
-//	if result := <-resultCh; result.Val != 2 {
-//		t.Errorf("We should receive result produced by second call, expected: 2, got %d", result.Val)
-//	}
-//}
+func TestForgetUnshared(t *testing.T) {
+	var g Group
+
+	var firstStarted, firstFinished sync.WaitGroup
+
+	firstStarted.Add(1)
+	firstFinished.Add(1)
+
+	key := "key"
+	firstCh := make(chan struct{})
+	go func() {
+		g.Do(key, func() (i interface{}, e error) {
+			firstStarted.Done()
+			fmt.Println("first started")
+			<-firstCh
+			return
+		})
+		firstFinished.Done()
+		fmt.Println("first DONE finished")
+	}()
+
+	firstStarted.Wait()
+	g.ForgetUnshared(key) // from this point no two function using same key should be executed concurrently
+
+	secondCh := make(chan struct{})
+	go func() {
+		g.Do(key, func() (i interface{}, e error) {
+			// Notify that we started
+			secondCh <- struct{}{}
+			fmt.Println("second started")
+			<-secondCh
+			return 2, nil
+		})
+	}()
+
+	<-secondCh
+	fmt.Println("second finished")
+	resultCh := g.DoChan(key, func() (i interface{}, e error) {
+		panic("third must not be started")
+	})
+
+	if g.ForgetUnshared(key) {
+		t.Errorf("Before first goroutine finished, key %q is shared, should return false", key)
+	}
+
+	close(firstCh)
+	firstFinished.Wait()
+	fmt.Println("first WAIT finished")
+	//check
+	fmt.Println(g.m.Load(key)) // -> false
+	fmt.Println(g.ForgetUnshared(key))
+	if g.ForgetUnshared(key) {
+		fmt.Println(g.m.Load(key)) // -> false
+		t.Errorf("After first goroutine finished, key %q is still shared, should return false", key)
+	}
+
+	secondCh <- struct{}{}
+
+	if result := <-resultCh; result.Val != 2 {
+		t.Errorf("We should receive result produced by second call, expected: 2, got %d", result.Val)
+	}
+}
+
 //
 //func TestDoAndForgetUnsharedRace(t *testing.T) {
 //	t.Parallel()
