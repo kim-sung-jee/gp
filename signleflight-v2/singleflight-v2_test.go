@@ -1,3 +1,7 @@
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package signleflight_v2
 
 import (
@@ -8,10 +12,6 @@ import (
 	"testing"
 	"time"
 )
-
-// Copyright 2013 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
 
 func TestDo(t *testing.T) {
 	var g Group
@@ -99,12 +99,10 @@ func TestForgetUnshared(t *testing.T) {
 	go func() {
 		g.Do(key, func() (i interface{}, e error) {
 			firstStarted.Done()
-			fmt.Println("first started")
 			<-firstCh
 			return
 		})
 		firstFinished.Done()
-		fmt.Println("first DONE finished")
 	}()
 
 	firstStarted.Wait()
@@ -115,14 +113,13 @@ func TestForgetUnshared(t *testing.T) {
 		g.Do(key, func() (i interface{}, e error) {
 			// Notify that we started
 			secondCh <- struct{}{}
-			fmt.Println("second started")
 			<-secondCh
 			return 2, nil
 		})
 	}()
 
 	<-secondCh
-	fmt.Println("second finished")
+
 	resultCh := g.DoChan(key, func() (i interface{}, e error) {
 		panic("third must not be started")
 	})
@@ -133,12 +130,8 @@ func TestForgetUnshared(t *testing.T) {
 
 	close(firstCh)
 	firstFinished.Wait()
-	fmt.Println("first WAIT finished")
-	//check
-	fmt.Println(g.m.Load(key)) // -> false
-	fmt.Println(g.ForgetUnshared(key))
+
 	if g.ForgetUnshared(key) {
-		fmt.Println(g.m.Load(key)) // -> false
 		t.Errorf("After first goroutine finished, key %q is still shared, should return false", key)
 	}
 
@@ -149,46 +142,45 @@ func TestForgetUnshared(t *testing.T) {
 	}
 }
 
-//
-//func TestDoAndForgetUnsharedRace(t *testing.T) {
-//	t.Parallel()
-//
-//	var g Group
-//	key := "key"
-//	d := time.Millisecond
-//	for {
-//		var calls, shared atomic.Int64
-//		const n = 1000
-//		var wg sync.WaitGroup
-//		wg.Add(n)
-//		for i := 0; i < n; i++ {
-//			go func() {
-//				g.Do(key, func() (interface{}, error) {
-//					time.Sleep(d)
-//					return calls.Add(1), nil
-//				})
-//				if !g.ForgetUnshared(key) {
-//					shared.Add(1)
-//				}
-//				wg.Done()
-//			}()
-//		}
-//		wg.Wait()
-//
-//		if calls.Load() != 1 {
-//			// The goroutines didn't park in g.Do in time,
-//			// so the key was re-added and may have been shared after the call.
-//			// Try again with more time to park.
-//			d *= 2
-//			continue
-//		}
-//
-//		// All of the Do calls ended up sharing the first
-//		// invocation, so the key should have been unused
-//		// (and therefore unshared) when they returned.
-//		if shared.Load() > 0 {
-//			t.Errorf("after a single shared Do, ForgetUnshared returned false %d times", shared.Load())
-//		}
-//		break
-//	}
-//}
+func TestDoAndForgetUnsharedRace(t *testing.T) {
+	t.Parallel()
+
+	var g Group
+	key := "key"
+	d := time.Millisecond
+	for {
+		var calls, shared atomic.Int64
+		const n = 1000
+		var wg sync.WaitGroup
+		wg.Add(n)
+		for i := 0; i < n; i++ {
+			go func() {
+				g.Do(key, func() (interface{}, error) {
+					time.Sleep(d)
+					return calls.Add(1), nil
+				})
+				if !g.ForgetUnshared(key) {
+					shared.Add(1)
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
+		if calls.Load() != 1 {
+			// The goroutines didn't park in g.Do in time,
+			// so the key was re-added and may have been shared after the call.
+			// Try again with more time to park.
+			d *= 2
+			continue
+		}
+
+		// All of the Do calls ended up sharing the first
+		// invocation, so the key should have been unused
+		// (and therefore unshared) when they returned.
+		if shared.Load() > 0 {
+			t.Errorf("after a single shared Do, ForgetUnshared returned false %d times", shared.Load())
+		}
+		break
+	}
+}
