@@ -59,11 +59,11 @@ func (g *Group) doCall(c *call, key string, fn func() (any, error)) {
 	//c := val.(*call)
 
 	c.val, c.err = fn()
+	// 안됨
+	c.wg.Done()
 	if val, _ := g.m.Load(key); val == c {
 		g.m.Delete(key)
 	}
-
-	c.wg.Done()
 
 	for _, ch := range c.chans {
 		ch <- Result{c.val, c.err, c.dups > 0}
